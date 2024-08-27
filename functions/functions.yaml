@@ -156,70 +156,157 @@ hexF:
 
   getEvery: >
     (
-      
+      /*Эксперимент по использованию функций высшего прядка для конструирования условий проверки */
+      $f_get_source := function($obj){ $obj.source };
+      $f_get_target := function($obj){ $obj.target };
+      $f_check_in := function($val, $list){ $val in $list };
+      $f_check_label_value := function($obj, $val){ $obj.label = $val };
+    
+      $f_and := function($f1, $f2){ function($par){ $f1($par) and $f2($par) } };
+    
       $heads:= $.heads; $tails:= $.tails; $dir:= $.dir; $label:= $.label?$.label:""; 
+      /*$log([$heads, $tails, $dir, $label], "getEvery_start");*/
       $edges:= $eval($$.hexF.edges);
+      $log($edges, "getEvery_step1");
 
-      $map($heads, function($v){(
-        $y:=$map($tails, function($vv) {(
-          $dir="<=" ? 
-            $label = "" ? $edges[$.source in $vv.* and $.target = $v] : $edges[$.source in $vv.* and $.target = $v and $.label = $label]
-              :
-            $label = "" ? $edges[$.source = $v and $.target in $vv.*] : $edges[$.source = $v and $.target in $vv.* and $.label = $label]
-        )});
-        $count($y) = $count($tails) ? $v
+      /*В зависимости от напрваления связи - source и target меняются местами*/
+      $f_get_head := dir="<=" ? $f_get_target : $f_get_source;
+      $f_get_tail := dir="<=" ? $f_get_source : $f_get_target;
+    
+      /* Основная логика фильтрации: мы отбираем среди связей такие, */
+      /* которые соответствуют источикуц, назначению и типу */
+      /* Проверка на равество выполняется через in чтобы можно ыло проверять сразу массив указателей*/
+      $check_func1 := function ($obj, $h, $t){ 
+            $obj ~> $f_get_head ~> $f_check_in(?, $h) 
+        and $obj ~> $f_get_tail ~> $f_check_in(?, $t)
+      };
+    
+      /* Модифицируем функцию в зависимости от того, указан ли тип связи в условии*/
+      $check_func := $label = "" ? $check_func1(?, $heads, $tails.*) : $f_and($check_func1(?, $heads, $tails.*), $f_check_label_value(?, $label));
+    
+      /* Этап предварительной фильтрации - проверяем на любые совпадения */
+      /* любых связей источников и назначений для сокращения объема */
+      /* обрабатываемых объектов на следующих этапах */
+      $edges_filtered := $edges[$check_func($)];
+    
+      $heads_filtered := $distinct( $f_get_head($edges_filtered) );
+      /*$log({"$edges2": $edges_filtered, "$heads_filtered" : $heads_filtered }, "getEvery_step2");*/
+
+      /* Цикл по хвостам связей (предполагается что их много меньше, */
+      /* чем узлов графа - так обработка цикла будет эффктивнее) */
+      /* На каждом шаге остаются только те узлы, которые попали в фильтр */
+      /* Таким образом к концу останвтся только узлу, у которых есть все типы связей*/
+      $map($tails, function($tail){(
+          $log([$tail], "getEvery_in_map");
+          $check_func := $label = "" ? $check_func1(?, $heads_filtered, $tail) : $f_and($check_func1(?, $heads_filtered, $tail), $f_check_label_value(?, $label));
+          $edges_filtered := $edges_filtered[$check_func($)];
+          $heads_filtered := $distinct( $f_get_head($edges_filtered) );
       )});
+    
+      /*$log($heads_filtered, "getEvery_end");*/
+      $heads_filtered;
     )
 
   getAny: >
     (
-      
+      /*Эксперимент по использованию функций высшего прядка для конструирования условий проверки */
+      $f_get_source := function($obj){ $obj.source };
+      $f_get_target := function($obj){ $obj.target };
+      $f_check_in := function($val, $list){ $val in $list };
+      $f_check_label_value := function($obj, $val){ $obj.label = $val };
+    
+      $f_and := function($f1, $f2){ function($par){ $f1($par) and $f2($par) } };
+    
       $heads:= $.heads; $tails:= $.tails; $dir:= $.dir; $label:= $.label?$.label:"";
       $edges:= $eval($$.hexF.edges);
 
-      $map($heads, function($v){(
-        $y:=$map($tails, function($vv) {(
-          $dir="<=" ? 
-            $label = "" ? $edges[$.source in $vv.* and $.target = $v] : $edges[$.source in $vv.* and $.target = $v and $.label = $label]
-              :
-            $label = "" ? $edges[$.source = $v and $.target in $vv.*] : $edges[$.source = $v and $.target in $vv.* and $.label = $label]
-        )});
-
-        $count($y) > 0 ? $v
-      )});
+      /*В зависимости от напрваления связи - source и target меняются местами*/
+      $f_get_head := dir="<=" ? $f_get_target : $f_get_source;
+      $f_get_tail := dir="<=" ? $f_get_source : $f_get_target;
+    
+      /* Основная логика фильтрации: мы отбираем среди связей такие, */
+      /* которые соответствуют источикуц, назначению и типу */
+      /* Проверка на равество выполняется через in чтобы можно ыло проверять сразу массив указателей*/
+      $check_func1 := function ($obj, $h, $t){ 
+            $obj ~> $f_get_head ~> $f_check_in(?, $h) 
+        and $obj ~> $f_get_tail ~> $f_check_in(?, $t)
+      };
+    
+      /* Модифицируем функцию в зависимости от того, указан ли тип связи в условии*/
+      $check_func := $label = "" ? $check_func1(?, $heads, $tails.*) : $f_and($check_func1(?, $heads, $tails.*), $f_check_label_value(?, $label));
+    
+      /* Этап предварительной фильтрации - проверяем на любые совпадения */
+      /* любых связей источников и назначений для сокращения объема */
+      /* обрабатываемых объектов на следующих этапах */
+      /* Для функции getAny - получается сразу необхоидмый результат*/
+      $edges_filtered := $edges[$check_func($)];
+    
+      $heads_filtered := $distinct( $f_get_head($edges_filtered) );
+      $heads_filtered;
     )
 
   getOne: >
     (
-      
+      /*Эксперимент по использованию функций высшего прядка для конструирования условий проверки */
+      $f_get_source := function($obj){ $obj.source };
+      $f_get_target := function($obj){ $obj.target };
+      $f_check_in := function($val, $list){ $val in $list };
+      $f_check_label_value := function($obj, $val){ $obj.label = $val };
+    
+      $f_and := function($f1, $f2){ function($par){ $f1($par) and $f2($par) } };
+    
       $heads:= $.heads; $tails:= $.tails; $dir:= $.dir; $label:= $.label?$.label:""; 
       $edges:= $eval($$.hexF.edges);
 
-      $map($heads, function($v){(
-        $y:=$map($tails, function($vv) {(
-          $dir="<=" ? 
-            $label = "" ? $edges[$.source in $vv.* and $.target = $v] : $edges[$.source in $vv.* and $.target = $v and $.label = $label]
-              :
-            $label = "" ? $edges[$.source = $v and $.target in $vv.*] : $edges[$.source = $v and $.target in $vv.* and $.label = $label]
-        )});
-        $count($y) = 1 ? $v
+      /*В зависимости от напрваления связи - source и target меняются местами*/
+      $f_get_head := dir="<=" ? $f_get_target : $f_get_source;
+      $f_get_tail := dir="<=" ? $f_get_source : $f_get_target;
+    
+      /* Основная логика фильтрации: мы отбираем среди связей такие, */
+      /* которые соответствуют источикуц, назначению и типу */
+      /* Проверка на равество выполняется через in чтобы можно ыло проверять сразу массив указателей*/
+      $check_func1 := function ($obj, $h, $t){ 
+            $obj ~> $f_get_head ~> $f_check_in(?, $h) 
+        and $obj ~> $f_get_tail ~> $f_check_in(?, $t)
+      };
+    
+      /* Модифицируем функцию в зависимости от того, указан ли тип связи в условии*/
+      $check_func := $label = "" ? $check_func1(?, $heads, $tails.*) : $f_and($check_func1(?, $heads, $tails.*), $f_check_label_value(?, $label));
+    
+      /* Этап предварительной фильтрации - проверяем на любые совпадения */
+      /* любых связей источников и назначений для сокращения объема */
+      /* обрабатываемых объектов на следующих этапах */
+      $edges_filtered := $edges[$check_func($)];
+    
+      $heads_filtered := $distinct( $f_get_head($edges_filtered) );
+      /* Идея обработки: получить список элементов для каждого хвоста ($tails) */
+      /* Посчитать для каждого элемента сколько у него было попаданий */
+      /* Оставить только те значения, у окторых было ровно 1 попадание */
+      $heads_array := $map($tails, function($tail){(
+        /*$log([$tail], "getOne_in_map");*/
+        $check_func := $label = "" ? $check_func1(?, $heads_filtered, $tail) : $f_and($check_func1(?, $heads_filtered, $tail), $f_check_label_value(?, $label));
+        $edges_filtered := $edges_filtered[$check_func($)];
+    
+        $heads_filtered := $distinct( $f_get_head($edges_filtered) );
+
       )});
+    
+      /* Группировка, фильтрация значений = 1, объединение значений таких ключей в массив*/
+      $res := [($heads_filtered.*{ $ : $count($) } ~> $spread()) [ $.* = 1 ]]. $keys()[0];
+      /*$log($res, "getOne_end");*/
+      $res
+    )
 
   getNone: >
     (
-      
+      /* Суть подхода - получить результат ANY для тех же сявзей и инвертировать его*/
       $heads:= $.heads; $tails:= $.tails; $dir:= $.dir; $label:= $.label?$.label:""; 
       $edges:= $eval($$.hexF.edges);
+      $any_result := $eval($$.hexF.getAny, $);
+    
+      $edges[ $not( $ in $any_result) ];
+    )
 
-      $map($heads, function($v){(
-        $y:=$map($tails, function($vv) {(
-          $dir="<=" ? 
-            $label = "" ? $edges[$.source in $vv.* and $.target = $v] : $edges[$.source in $vv.* and $.target = $v and $.label = $label]
-              :
-            $label = "" ? $edges[$.source = $v and $.target in $vv.*] : $edges[$.source = $v and $.target in $vv.* and $.label = $label]
-        )});
-        $count($y) = 0 ? $v
-      )});
 #todo metalabels
   resolveView: >
     (
